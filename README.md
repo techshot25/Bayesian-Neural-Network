@@ -4,12 +4,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 21 15:47:23 2019
+Created on Thu Jun 20 15:47:23 2019
 
 Credit:
     https://github.com/paraschopra/bayesian-neural-network-mnist
 
-@author: ashannon
+@author: Ali Shannon
 """
 
 #%% Libraries to use
