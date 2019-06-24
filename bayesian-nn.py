@@ -1,6 +1,3 @@
-
-
-```python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -29,12 +26,9 @@ from pyro.infer import SVI, Trace_ELBO
 import pyro.distributions as dist
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-```
 
-This is our pytorch network that we will "lift" into a pyro module
+#%% Define the PyTorch module
 
-
-```python
 class NN(nn.Module):
     def __init__(self, in_shape, hidden_shape, out_shape):
         super(NN, self).__init__()
@@ -60,12 +54,9 @@ test_loader = DataLoader(
         
 # this will be our neural network
 net = NN(28*28, 1024, 10).to(device)
-```
 
-Here we will defined the converter to random variables `pyro.random_module` where the output of our network are random variables
+#%% Convert to Pyro model
 
-
-```python
 def model(x, y):
     priors = {}
     for name, param in net.named_parameters():
@@ -76,29 +67,9 @@ def model(x, y):
     lifted_clf_model = lifted_module()
     lhat = F.log_softmax(lifted_clf_model(x), 1)
     pyro.sample("obs", dist.Categorical(logits=lhat), obs=y)
-```
-
-This is how the Bayesian network works, it uses this form of Bayes Theorem
-
-```math
-P(A|B) = \frac{P(B|A)\; P(A)}{P(B)}
-```
-
-Where:
-
-```math
-P(B) = \sum_{i} P(B|A_{i})\; P(A_{i})
-```
-
-But this sum is very hard to compute because there will be too many parameters. So instead we will draw random samples and report the posterior mean as our point estimate and posterior uncertainty as our error. This is at the heart of Stochastic Variational Inference (SVI): https://www.youtube.com/watch?v=DYRK0-_K2UU
-
-Roughly, this method assumes that the prior is always some normal distribution and updates the point estimates through the network.
-
-
-
-
-
-```python
+    
+#%% Define the guide for SVI
+    
 def guide(x, y):
     priors = {}
     for name, param in net.named_parameters():
@@ -111,20 +82,14 @@ def guide(x, y):
         
     lifted_module = pyro.random_module('module', net, priors)
     return lifted_module()
-```
 
-Set up optimizer and loss function
+#%% Set up optimizer and loss function
 
-
-```python
 opt = optim.Adam({'lr': 0.01})
 svi = SVI(model, guide, opt, loss=Trace_ELBO())
-```
 
-Train Model
+#%% Train Model
 
-
-```python
 def train():
     pyro.clear_param_store()
     epochs = 10
@@ -138,30 +103,13 @@ def train():
         
 train()
     
-```
-
-    epoch: 1	Loss: 2073
-    epoch: 2	Loss: 363.2
-    epoch: 3	Loss: 155.8
-    epoch: 4	Loss: 110.5
-    epoch: 5	Loss: 95.18
-    epoch: 6	Loss: 89.92
-    epoch: 7	Loss: 87.03
-    epoch: 8	Loss: 86.42
-    epoch: 9	Loss: 85.71
-    epoch: 10	Loss: 85.49
-
-
-There are two ways to evaluate this network.
-
-- The first is to force it to predict even if it's unsure, which is what traditional neural networks do
-- The second is to make the network say 'I don't know.' Which is what we want. This works by drawing samples and checking if they agree on the result.
-
+#%% Evaluate model
+"""There are two ways to evaluate this network.
+The first is to force it to predict even if it's unsure.
+The second is to make the network say 'I don't know.' Which is what we want
 Let's try the first one:
-
-
-
-```python
+"""
+    
 num_samples = 10
 def predict(x):
     sampled_models = [guide(None, None) for _ in range(num_samples)]
@@ -177,16 +125,9 @@ for x, y in test_loader:
     total += y.size(0)
     correct += (predicted == y.numpy()).sum().item()
 print(f'Accuracy: {correct/total:.2%}')
-```
 
-    Prediction when network is forced to predict
-    Accuracy: 88.69%
+#%% Now we let the network decide whether or not to predict 
 
-
-Now we let the network decide whether or not to predict 
-
-
-```python
 classes = [str(i) for i in range(10)]
 
 num_samples = 100
@@ -258,14 +199,14 @@ def test_batch(images, labels, plot=True):
             predicted_for_images+=1
             if(labels[i].item()==predicted):
                 if(plot):
-                    print("Correct\n")
+                    print("Correct")
                 correct_predictions +=1.0
             else:
                 if(plot):
-                    print("Incorrect :()\n")
+                    print("Incorrect :()")
         else:
             if(plot):
-                print("Undecided.\n")
+                print("Undecided.")
         
         if(plot):
             plt.imshow(images[i].squeeze())
@@ -275,7 +216,7 @@ def test_batch(images, labels, plot=True):
         print("Summary")
         print("Total images: ",len(labels))
         print("Predicted for: ",predicted_for_images)
-        print("Accuracy when predicted: ",correct_predictions/predicted_for_images)
+        print(f"Accuracy when predicted: {correct_predictions/predicted_for_images:.2%}")
         
     return len(labels), correct_predictions, predicted_for_images
 
@@ -287,10 +228,10 @@ print('Prediction when network can refuse')
 correct = 0
 total = 0
 total_predicted_for = 0
-for j, data in enumerate(test_loader):
-    images, labels = data
+for x, y in test_loader:
     
-    total_minibatch, correct_minibatch, predictions_minibatch = test_batch(images, labels, plot=False)
+    total_minibatch, correct_minibatch, predictions_minibatch = test_batch(
+                                    x.to(device), y.to(device), plot=False)
     total += total_minibatch
     correct += correct_minibatch
     total_predicted_for += predictions_minibatch
@@ -298,165 +239,3 @@ for j, data in enumerate(test_loader):
 print("Total images: ", total)
 print("Skipped: ", total-total_predicted_for)
 print(f"Accuracy when made predictions: {correct/total_predicted_for:.2%}")
-```
-
-    Prediction when network can refuse
-    Total images:  10000
-    Skipped:  1101
-    Accuracy when made predictions: 95.03%
-
-
-Print out samples of distributions for each digit
-
-
-```python
-test_batch(images[:10], labels[:10])
-```
-
-    Real:  6
-
-
-
-![png](output_16_1.png)
-
-
-    Correct
-    
-    Real:  6
-
-
-
-![png](output_16_3.png)
-
-
-
-![png](output_16_4.png)
-
-
-    Correct
-    
-    Real:  0
-
-
-
-![png](output_16_6.png)
-
-
-
-![png](output_16_7.png)
-
-
-    Correct
-    
-    Real:  9
-
-
-
-![png](output_16_9.png)
-
-
-
-![png](output_16_10.png)
-
-
-    Incorrect :()
-    
-    Real:  8
-
-
-
-![png](output_16_12.png)
-
-
-
-![png](output_16_13.png)
-
-
-    Undecided.
-    
-    Real:  4
-
-
-
-![png](output_16_15.png)
-
-
-
-![png](output_16_16.png)
-
-
-    Correct
-    
-    Real:  3
-
-
-
-![png](output_16_18.png)
-
-
-
-![png](output_16_19.png)
-
-
-    Incorrect :()
-    
-    Real:  3
-
-
-
-![png](output_16_21.png)
-
-
-
-![png](output_16_22.png)
-
-
-    Correct
-    
-    Real:  3
-
-
-
-![png](output_16_24.png)
-
-
-
-![png](output_16_25.png)
-
-
-    Incorrect :()
-    
-    Real:  8
-
-
-
-![png](output_16_27.png)
-
-
-
-![png](output_16_28.png)
-
-
-    Correct
-    
-    Summary
-    Total images:  10
-    Predicted for:  9
-    Accuracy when predicted:  0.6666666666666666
-
-
-
-
-
-    (10, 6.0, 9)
-
-
-
-
-![png](output_16_31.png)
-
-
-
-```python
-
-```
