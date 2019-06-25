@@ -80,15 +80,11 @@ def model(x, y):
 
 This is how the Bayesian network works, it uses this form of Bayes Theorem
 
-```math
-P(A|B) = \frac{P(B|A)\; P(A)}{P(B)}
-```
+$$P(A|B) = \frac{P(B|A)\; P(A)}{P(B)}$$
 
 Where:
 
-```math
-P(B) = \sum_{i} P(B|A_{i})\; P(A_{i})
-```
+$$P(B) = \sum_{i} P(B|A_{i})\; P(A_{i})$$
 
 But this sum is very hard to compute because there will be too many parameters. So instead we will draw random samples and report the posterior mean as our point estimate and posterior uncertainty as our error. This is at the heart of Stochastic Variational Inference (SVI): https://www.youtube.com/watch?v=DYRK0-_K2UU
 
